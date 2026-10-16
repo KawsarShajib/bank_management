@@ -245,3 +245,26 @@ class AccountDetailView(generics.RetrieveAPIView):
     serializer_class = BankAccountSerializer
     lookup_field = 'id'
 ```
+
+### Step 5 — accounts/urls.py
+
+```Python
+from django.urls import path
+from .views import AccountListCreateView, AccountDetailView
+
+urlpatterns = [
+    path('accounts/', AccountListCreateView.as_view(), name='account-list-create'),
+    path('accounts/<int:id>/', AccountDetailView.as_view(), name='account-detail'),
+]
+```
+
+### Step 6 - Connect it in the project - bank_management/urls.py :
+
+```Python
+from django.contrib import admin
+from django.urls import path, include
+
+urlpatterns = [
+    path('admin/', admin.site.urls),
+    path('api/', include('accounts.urls')),
+]
