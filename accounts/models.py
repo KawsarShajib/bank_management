@@ -43,4 +43,18 @@ class BankAccount(models.Model):
         return f"{self.account_number} - {self.owner.username} ({self.account_type})"
 
 
+    def save(self, *args, **kwargs):
+        if not self.account_number:
+            self.account_number = self._generate_account_number()
+        super().save(*args, **kwargs)
 
+    def _generate_account_number(self):
+        """Generate a unique 12-digit account number."""
+        while True:
+            number = str(uuid.uuid4().int)[:12]
+            if not BankAccount.objects.filter(account_number=number).exists():
+                return number
+
+    def can_withdraw(self, amount):
+        """Check if withdrawal of given amount is possible."""
+        return self.balance >= amount and self.status == 'ACTIVE'
