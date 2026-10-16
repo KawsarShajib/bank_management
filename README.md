@@ -226,3 +226,22 @@ class BankAccountSerializer(serializers.ModelSerializer):
         # For now we can accept owner in the request body (temporary)
         return super().create(validated_data)
 ```
+
+### Step 4 — accounts/views.py (Only account-related views)
+
+```Python
+from rest_framework import generics
+from .models import BankAccount
+from .serializers import BankAccountSerializer
+
+
+class AccountListCreateView(generics.ListCreateAPIView):
+    queryset = BankAccount.objects.all()
+    serializer_class = BankAccountSerializer
+
+
+class AccountDetailView(generics.RetrieveAPIView):
+    queryset = BankAccount.objects.all()
+    serializer_class = BankAccountSerializer
+    lookup_field = 'id'
+```
