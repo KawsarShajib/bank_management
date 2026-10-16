@@ -64,6 +64,14 @@ bank_management/          # Project root
 
 ---
 
+## Login Credentials Used
+
+| username | password |
+|----------|----------|
+| admin    | admin    |
+| kawsar    | Sonali@123    |
+
+
 ## Installation & Environment Setup
 
 ### 1. Prerequisites
@@ -454,35 +462,21 @@ status          → defaults to ACTIVE
 
 ![alt text](<screenshots/2. successful user registration and token creation.png>)
 
-Step 3: Test in Postman (in this order)
+## Test in Postman (in this order)
 
 ---
-###	Request	                            |   Auth header	        |    Expected
---------------------------------------------------------------------------------------------------
-1	POST /api/auth/register/	        |   none	            |    201 + token
---------------------------------------------------------------------------------------------------
-2	POST /api/auth/login/               |   none	            |    200 + token
-    with {"username","password"}	    
---------------------------------------------------------------------------------------------------
-3	GET /api/auth/profile/	            |   Token <key>	        |    200
---------------------------------------------------------------------------------------------------
-4	PATCH /api/auth/profile/            |   Token <key>	        |    200
-    with {"first_name":"Kawsar"}	    
---------------------------------------------------------------------------------------------------
-5	POST /api/accounts/                 |   Token <key>	        |    201
-    with {"account_type":"SAVINGS"}	
---------------------------------------------------------------------------------------------------
-6	GET /api/accounts/	                |   Token <key>	        |    200, only your accounts
---------------------------------------------------------------------------------------------------
-7	GET /api/accounts/1/	            |   Token <key>	        |    200
---------------------------------------------------------------------------------------------------
-8	GET /api/accounts/1/balance/	    |   Token <key>	        |    200
---------------------------------------------------------------------------------------------------
-9	GET /api/admin/customers/	        |   customer token	    |    403
---------------------------------------------------------------------------------------------------
-10	Log in as the superuser, then       |   admin token	        |    200
-    GET /api/admin/customers/ and 
-    GET /api/admin/accounts/	
+| # | Request & Payload | Auth Header | Expected |
+| :--- | :--- | :--- | :--- |
+| **1** | `POST` `/api/auth/register/` | None | 201 + token |
+| **2** | `POST` `/api/auth/login/`<br>`{"username", "password"}` | None | 200 + token |
+| **3** | `GET` `/api/auth/profile/` | `Token <key>` | 200 |
+| **4** | `PATCH` `/api/auth/profile/`<br>`{"first_name": "Kawsar"}` | `Token <key>` | 200 |
+| **5** | `POST` `/api/accounts/`<br>`{"account_type": "SAVINGS"}` | `Token <key>` | 201 |
+| **6** | `GET` `/api/accounts/` | `Token <key>` | 200, only your accounts |
+| **7** | `GET` `/api/accounts/1/` | `Token <key>` | 200 |
+| **8** | `GET` `/api/accounts/1/balance/` | `Token <key>` | 200 |
+| **9** | `GET` `/api/admin/customers/` | Customer token | 403 |
+| **10** | Log in as superuser, then:<br>`GET` `/api/admin/customers/`<br>`GET` `/api/admin/accounts/` | Admin token | 200 |
 ---
 
 ### Screenshots : 
