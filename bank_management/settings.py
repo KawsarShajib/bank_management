@@ -39,10 +39,10 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     # Third party
     'rest_framework',
-    'rest_framework.authtoken',
+    # 'rest_framework.authtoken', # for Token authentication
     # Local apps
     'accounts',
-    'transactions',
+    # 'transactions',
 ]
 
 MIDDLEWARE = [
@@ -140,16 +140,21 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # Django REST Framework configuration
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
-        'rest_framework.authentication.TokenAuthentication',
-        'rest_framework.authentication.SessionAuthentication',
+        'rest_framework.permissions.AllowAny',   # temporary – we will change later
+        # # TokenAuthentication → clients send Authorization: Token <key>
+        # 'rest_framework.authentication.TokenAuthentication',
+        # # SessionAuthentication ->Django’s built-in (the default in DRF when you don’t force Token)
+        # 'rest_framework.authentication.SessionAuthentication',
     ],
+
+    # IsAuthenticated → every endpoint requires login by default
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticated',
     ],
-    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
-    'PAGE_SIZE': 10,
-    'DEFAULT_RENDERER_CLASSES': [
-        'rest_framework.renderers.JSONRenderer',
-        'rest_framework.renderers.BrowsableAPIRenderer',
-    ],
+    # 'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
+    # 'PAGE_SIZE': 10,
+    # 'DEFAULT_RENDERER_CLASSES': [
+    #     'rest_framework.renderers.JSONRenderer',
+    #     'rest_framework.renderers.BrowsableAPIRenderer',
+    # ],
 }

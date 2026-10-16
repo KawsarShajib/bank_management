@@ -23,6 +23,7 @@ class BankAccount(models.Model):
         max_digits=15,
         decimal_places=2,
         default=Decimal('0.00'),
+        # never negative
         validators=[MinValueValidator(Decimal('0.00'))]
     )
     owner = models.ForeignKey(
@@ -35,26 +36,29 @@ class BankAccount(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
+        # ordering & admin display names
         ordering = ['-created_at']
         verbose_name = 'Bank Account'
         verbose_name_plural = 'Bank Accounts'
 
     def __str__(self):
+        # for a nice display in admin
         return f"{self.account_number} - {self.owner.username} ({self.account_type})"
 
 
     def save(self, *args, **kwargs):
+        # Override save() → auto-generate unique account number
         if not self.account_number:
             self.account_number = self._generate_account_number()
         super().save(*args, **kwargs)
 
     def _generate_account_number(self):
-        """Generate a unique 12-digit account number."""
+        # Helper method for a unique 12-digit account number
         while True:
             number = str(uuid.uuid4().int)[:12]
             if not BankAccount.objects.filter(account_number=number).exists():
                 return number
 
     def can_withdraw(self, amount):
-        """Check if withdrawal of given amount is possible."""
+        # Business rule : Check if withdrawal of given amount is possible
         return self.balance >= amount and self.status == 'ACTIVE'
