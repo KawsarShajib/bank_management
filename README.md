@@ -225,6 +225,37 @@ from .models import BankAccount
 from django.contrib.auth.models import User
 from django.contrib.auth.password_validation import validate_password
 
+class UserRegistrationSerializer(serializers.ModelSerializer):
+    password = serializers.CharField(write_only=True, required=True, validators=[validate_password])
+    password2 = serializers.CharField(write_only=True, required=True)
+    email = serializers.EmailField(required=True)
+
+    class Meta:
+        model = User
+        fields = ('username', 'email', 'password', 'password2', 'first_name', 'last_name')
+        extra_kwargs = {
+            'first_name': {'required': False},
+            'last_name': {'required': False},
+        }
+
+    def validate(self, attrs):
+        if attrs['password'] != attrs['password2']:
+            raise serializers.ValidationError({"password": "Password fields didn't match."})
+        if User.objects.filter(email=attrs['email']).exists():
+            raise serializers.ValidationError({"email": "A user with this email already exists."})
+        return attrs
+
+    def create(self, validated_data):
+        validated_data.pop('password2')
+        user = User.objects.create_user(
+            username=validated_data['username'],
+            email=validated_data['email'],
+            password=validated_data['password'],
+            first_name=validated_data.get('first_name', ''),
+            last_name=validated_data.get('last_name', ''),
+        )
+        return user
+
 
 # Purpose: Convert models <--> JSON and perform validation.
 class BankAccountSerializer(serializers.ModelSerializer):
@@ -262,37 +293,6 @@ class BankAccountSerializer(serializers.ModelSerializer):
         return super().create(validated_data)
 
 
-
-class UserRegistrationSerializer(serializers.ModelSerializer):
-    password = serializers.CharField(write_only=True, required=True, validators=[validate_password])
-    password2 = serializers.CharField(write_only=True, required=True)
-    email = serializers.EmailField(required=True)
-
-    class Meta:
-        model = User
-        fields = ('username', 'email', 'password', 'password2', 'first_name', 'last_name')
-        extra_kwargs = {
-            'first_name': {'required': False},
-            'last_name': {'required': False},
-        }
-
-    def validate(self, attrs):
-        if attrs['password'] != attrs['password2']:
-            raise serializers.ValidationError({"password": "Password fields didn't match."})
-        if User.objects.filter(email=attrs['email']).exists():
-            raise serializers.ValidationError({"email": "A user with this email already exists."})
-        return attrs
-
-    def create(self, validated_data):
-        validated_data.pop('password2')
-        user = User.objects.create_user(
-            username=validated_data['username'],
-            email=validated_data['email'],
-            password=validated_data['password'],
-            first_name=validated_data.get('first_name', ''),
-            last_name=validated_data.get('last_name', ''),
-        )
-        return user
 ```
 
 ### Step 4 — accounts/views.py
@@ -454,12 +454,36 @@ status          → defaults to ACTIVE
 
 ![alt text](<screenshots/2. successful user registration and token creation.png>)
 
-Step 3: Testing of account creation, list of account and one single account
+Step 3: Test in Postman (in this order)
 
-```text
-POST /api/accounts/     → create account (send account_type + owner)
-GET /api/accounts/      → list all accounts
-GET /api/accounts/1/    → get one account
+---
+#	Request	                            |   Auth header	        |    Expected
+--------------------------------------------------------------------------------------------------
+1	POST /api/auth/register/	        |   none	            |    201 + token
+--------------------------------------------------------------------------------------------------
+2	POST /api/auth/login/               |   none	            |    200 + token
+    with {"username","password"}	    
+--------------------------------------------------------------------------------------------------
+3	GET /api/auth/profile/	            |   Token <key>	        |    200
+--------------------------------------------------------------------------------------------------
+4	PATCH /api/auth/profile/            |   Token <key>	        |    200
+    with {"first_name":"Kawsar"}	    
+--------------------------------------------------------------------------------------------------
+5	POST /api/accounts/                 |   Token <key>	        |    201
+    with {"account_type":"SAVINGS"}	
+--------------------------------------------------------------------------------------------------
+6	GET /api/accounts/	                |   Token <key>	        |    200, only your accounts
+--------------------------------------------------------------------------------------------------
+7	GET /api/accounts/1/	            |   Token <key>	        |    200
+--------------------------------------------------------------------------------------------------
+8	GET /api/accounts/1/balance/	    |   Token <key>	        |    200
+--------------------------------------------------------------------------------------------------
+9	GET /api/admin/customers/	        |   customer token	    |    403
+--------------------------------------------------------------------------------------------------
+10	Log in as the superuser, then       |   admin token	        |    200
+    GET /api/admin/customers/ and 
+    GET /api/admin/accounts/	
+---
 ```
 
 ### Screenshots : 
@@ -468,7 +492,10 @@ GET /api/accounts/1/    → get one account
 
 ![alt text](<screenshots/4. get created account number.png>)
 
-![alt text](<screenshots/5. get created all account numbers.png>)
+![alt text](<screenshots/5. get all created account numbers of the logged in user.png>)
 
 ![alt text](<screenshots/6. Admin Panel.png>)
+
+
+
 
