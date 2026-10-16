@@ -457,7 +457,7 @@ status          → defaults to ACTIVE
 Step 3: Test in Postman (in this order)
 
 ---
-#	Request	                            |   Auth header	        |    Expected
+###	Request	                            |   Auth header	        |    Expected
 --------------------------------------------------------------------------------------------------
 1	POST /api/auth/register/	        |   none	            |    201 + token
 --------------------------------------------------------------------------------------------------
@@ -484,7 +484,6 @@ Step 3: Test in Postman (in this order)
     GET /api/admin/customers/ and 
     GET /api/admin/accounts/	
 ---
-```
 
 ### Screenshots : 
 
