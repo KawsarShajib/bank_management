@@ -16,7 +16,7 @@ from .serializers import (
 )
 
 
-# Order follows the customer journey: register → login → profile → accounts → balance → admin.
+""" Order follows the customer journey: register → login → profile → accounts → balance → admin """
 
 # class IsOwnerOrAdmin(permissions.BasePermission):
 #     """Custom permission: only owner or admin can access."""

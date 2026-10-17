@@ -42,7 +42,7 @@ INSTALLED_APPS = [
     'rest_framework.authtoken', # for Token authentication
     # Local apps
     'accounts',
-    # 'transactions',
+    'transactions',
 ]
 
 MIDDLEWARE = [
