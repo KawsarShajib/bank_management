@@ -16,15 +16,20 @@ from .serializers import (
 )
 
 
-""" Order follows the customer journey: register → login → profile → accounts → balance → admin """
+""" 
 
-# class IsOwnerOrAdmin(permissions.BasePermission):
-#     """Custom permission: only owner or admin can access."""
+    Order follows the customer journey: 
+        register → login → profile → accounts → balance → admin 
 
-#     def has_object_permission(self, request, view, obj):
-#         if request.user.is_staff:
-#             return True
-#         return obj.owner == request.user
+"""
+
+class IsOwnerOrAdmin(permissions.BasePermission):
+    """Custom permission: only owner or admin can access."""
+
+    def has_object_permission(self, request, view, obj):
+        if request.user.is_staff:
+            return True
+        return obj.owner == request.user
     
 
 # ---------- Authentication ----------

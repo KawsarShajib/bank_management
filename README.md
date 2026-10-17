@@ -149,7 +149,6 @@ REST_FRAMEWORK = {
     ],
 }
 ```
-We keep permission open for now so we can test account creation easily.
 
 ### Step 2 — accounts/models.py
 
@@ -226,6 +225,7 @@ python manage.py migrate
 ```
 
 ### Step 3 — accounts/serializers.py
+
 
 ```Python
 from rest_framework import serializers
@@ -350,20 +350,21 @@ from .serializers import (
 )
 
 
+
 """ 
 
-Order follows the customer journey: 
-register → login → profile → accounts → balance → admin 
+    Order follows the customer journey: 
+        register → login → profile → accounts → balance → admin 
 
 """
 
-# class IsOwnerOrAdmin(permissions.BasePermission):
-#     """Custom permission: only owner or admin can access."""
+class IsOwnerOrAdmin(permissions.BasePermission):
+    """Custom permission: only owner or admin can access."""
 
-#     def has_object_permission(self, request, view, obj):
-#         if request.user.is_staff:
-#             return True
-#         return obj.owner == request.user
+    def has_object_permission(self, request, view, obj):
+        if request.user.is_staff:
+            return True
+        return obj.owner == request.user
     
 
 # ---------- Authentication ----------
@@ -517,7 +518,7 @@ urlpatterns = [
 ]
 ```
 
-## Test the Bank Account API in POSTMAN
+### Test the Bank Account API in POSTMAN
 
 Create a user first (or you can go with the admin panel)
 
@@ -595,6 +596,8 @@ status          → defaults to ACTIVE
 | **10** | Log in as superuser, then:<br>`GET` `/api/admin/customers/`<br>`GET` `/api/admin/accounts/` | Admin token | 200 |
 ---
 
+
+
 ### Screenshots : 
 
 ![alt text](<screenshots/3. new account creation via POSTMAN.png>)
@@ -606,5 +609,609 @@ status          → defaults to ACTIVE
 ![alt text](<screenshots/6. Admin Panel.png>)
 
 
+
+
+## Creating the transactions app (models, serializers, views, urls)
+
+```bash
+python manage.py startapp transactions
+```
+
+### Step 7 —  preparing the bank_management/settings.py
+
+```Python
+INSTALLED_APPS = [
+    ...
+    'transactions',
+]
+```
+
+### Step 8 — transactions/models.py
+
+```bash
+from django.db import models
+from django.contrib.auth.models import User
+from django.core.validators import MinValueValidator
+from decimal import Decimal
+from accounts.models import BankAccount
+import uuid
+
+
+class Transaction(models.Model):
+    TRANSACTION_TYPES = (
+        ('DEPOSIT', 'Deposit'),
+        ('WITHDRAWAL', 'Withdrawal'),
+        ('TRANSFER', 'Transfer'),
+    )
+
+    transaction_id = models.CharField(max_length=36, unique=True, editable=False)
+    transaction_type = models.CharField(max_length=12, choices=TRANSACTION_TYPES)
+    amount = models.DecimalField(
+        max_digits=15,
+        decimal_places=2,
+        validators=[MinValueValidator(Decimal('0.01'))]
+    )
+    # For deposit and withdrawal
+    account = models.ForeignKey(
+        BankAccount,
+        on_delete=models.CASCADE,
+        related_name='transactions',
+        null=True,
+        blank=True
+    )
+    # For transfers
+    from_account = models.ForeignKey(
+        BankAccount,
+        on_delete=models.CASCADE,
+        related_name='outgoing_transfers',
+        null=True,
+        blank=True
+    )
+    to_account = models.ForeignKey(
+        BankAccount,
+        on_delete=models.CASCADE,
+        related_name='incoming_transfers',
+        null=True,
+        blank=True
+    )
+    description = models.CharField(max_length=255, blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    created_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name='transactions_created'
+    )
+
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = 'Transaction'
+        verbose_name_plural = 'Transactions'
+
+    def __str__(self):
+        return f"{self.transaction_id} - {self.transaction_type} - {self.amount}"
+
+    def save(self, *args, **kwargs):
+        if not self.transaction_id:
+            self.transaction_id = str(uuid.uuid4())
+        super().save(*args, **kwargs)
+```
+
+```Bash
+python manage.py makemigrations accounts
+python manage.py migrate
+```
+
+### Step 9 — transactions/serializers.py
+
+```bash
+from rest_framework import serializers
+from decimal import Decimal
+from django.db import transaction as db_transaction
+from accounts.models import BankAccount
+from .models import Transaction
+
+
+class DepositSerializer(serializers.Serializer):
+    account_id = serializers.IntegerField()
+    amount = serializers.DecimalField(max_digits=15, decimal_places=2, min_value=Decimal('0.01'))
+    description = serializers.CharField(max_length=255, required=False, allow_blank=True)
+
+    def validate_account_id(self, value):
+        user = self.context['request'].user
+        try:
+            account = BankAccount.objects.get(id=value, owner=user, status='ACTIVE')
+        except BankAccount.DoesNotExist:
+            raise serializers.ValidationError("Account not found or you do not have permission.")
+        return value
+
+    def create(self, validated_data):
+        user = self.context['request'].user
+        account = BankAccount.objects.get(id=validated_data['account_id'], owner=user)
+        amount = validated_data['amount']
+        description = validated_data.get('description', 'Deposit')
+
+        with db_transaction.atomic():
+            account.balance += amount
+            account.save()
+            txn = Transaction.objects.create(
+                transaction_type='DEPOSIT',
+                amount=amount,
+                account=account,
+                description=description,
+                created_by=user
+            )
+        return txn
+
+
+class WithdrawSerializer(serializers.Serializer):
+    account_id = serializers.IntegerField()
+    amount = serializers.DecimalField(max_digits=15, decimal_places=2, min_value=Decimal('0.01'))
+    description = serializers.CharField(max_length=255, required=False, allow_blank=True)
+
+    def validate(self, attrs):
+        user = self.context['request'].user
+        try:
+            account = BankAccount.objects.get(id=attrs['account_id'], owner=user, status='ACTIVE')
+        except BankAccount.DoesNotExist:
+            raise serializers.ValidationError({"account_id": "Account not found or you do not have permission."})
+
+        if not account.can_withdraw(attrs['amount']):
+            raise serializers.ValidationError({"amount": "Insufficient balance for this withdrawal."})
+        attrs['account'] = account
+        return attrs
+
+    def create(self, validated_data):
+        user = self.context['request'].user
+        account = validated_data['account']
+        amount = validated_data['amount']
+        description = validated_data.get('description', 'Withdrawal')
+
+        with db_transaction.atomic():
+            account.balance -= amount
+            account.save()
+            txn = Transaction.objects.create(
+                transaction_type='WITHDRAWAL',
+                amount=amount,
+                account=account,
+                description=description,
+                created_by=user
+            )
+        return txn
+
+
+class TransferSerializer(serializers.Serializer):
+    from_account_id = serializers.IntegerField()
+    to_account_number = serializers.CharField(max_length=20)
+    amount = serializers.DecimalField(max_digits=15, decimal_places=2, min_value=Decimal('0.01'))
+    description = serializers.CharField(max_length=255, required=False, allow_blank=True)
+
+    def validate(self, attrs):
+        user = self.context['request'].user
+        try:
+            from_account = BankAccount.objects.get(
+                id=attrs['from_account_id'], owner=user, status='ACTIVE'
+            )
+        except BankAccount.DoesNotExist:
+            raise serializers.ValidationError(
+                {"from_account_id": "Source account not found or you do not have permission."}
+            )
+
+        try:
+            to_account = BankAccount.objects.get(
+                account_number=attrs['to_account_number'], status='ACTIVE'
+            )
+        except BankAccount.DoesNotExist:
+            raise serializers.ValidationError(
+                {"to_account_number": "Destination account not found or is inactive."}
+            )
+
+        if from_account.id == to_account.id:
+            raise serializers.ValidationError(
+                {"to_account_number": "Cannot transfer money to the same account."}
+            )
+
+        if not from_account.can_withdraw(attrs['amount']):
+            raise serializers.ValidationError(
+                {"amount": "Insufficient balance for this transfer."}
+            )
+
+        attrs['from_account'] = from_account
+        attrs['to_account'] = to_account
+        return attrs
+
+    def create(self, validated_data):
+        user = self.context['request'].user
+        from_account = validated_data['from_account']
+        to_account = validated_data['to_account']
+        amount = validated_data['amount']
+        description = validated_data.get('description', f'Transfer to {to_account.account_number}')
+
+        with db_transaction.atomic():
+            from_account.balance -= amount
+            to_account.balance += amount
+            from_account.save()
+            to_account.save()
+
+            txn = Transaction.objects.create(
+                transaction_type='TRANSFER',
+                amount=amount,
+                from_account=from_account,
+                to_account=to_account,
+                description=description,
+                created_by=user
+            )
+        return txn
+
+
+class TransactionSerializer(serializers.ModelSerializer):
+    account_number = serializers.SerializerMethodField()
+    from_account_number = serializers.CharField(source='from_account.account_number', read_only=True, default=None)
+    to_account_number = serializers.CharField(source='to_account.account_number', read_only=True, default=None)
+    created_by_username = serializers.CharField(source='created_by.username', read_only=True, default=None)
+
+    class Meta:
+        model = Transaction
+        fields = (
+            'id', 'transaction_id', 'transaction_type', 'amount',
+            'account', 'account_number',
+            'from_account', 'from_account_number',
+            'to_account', 'to_account_number',
+            'description', 'created_at', 'created_by', 'created_by_username'
+        )
+        read_only_fields = fields
+
+    def get_account_number(self, obj):
+        if obj.account:
+            return obj.account.account_number
+        return None
+
+```
+
+### Step 10 — transactions/views.py
+
+```bash
+from rest_framework import generics, status, permissions
+from rest_framework.response import Response
+from rest_framework.views import APIView
+from django.db.models import Q
+from accounts.models import BankAccount
+from .models import Transaction
+from .serializers import (
+    DepositSerializer,
+    WithdrawSerializer,
+    TransferSerializer,
+    TransactionSerializer,
+)
+
+
+class DepositView(APIView):
+    """Deposit money into an account."""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        serializer = DepositSerializer(data=request.data, context={'request': request})
+        if serializer.is_valid():
+            txn = serializer.save()
+            return Response({
+                'message': 'Deposit successful.',
+                'transaction': TransactionSerializer(txn).data
+            }, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class WithdrawView(APIView):
+    """Withdraw money from an account."""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        serializer = WithdrawSerializer(data=request.data, context={'request': request})
+        if serializer.is_valid():
+            txn = serializer.save()
+            return Response({
+                'message': 'Withdrawal successful.',
+                'transaction': TransactionSerializer(txn).data
+            }, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class TransferView(APIView):
+    """Transfer money between accounts."""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        serializer = TransferSerializer(data=request.data, context={'request': request})
+        if serializer.is_valid():
+            txn = serializer.save()
+            return Response({
+                'message': 'Transfer successful.',
+                'transaction': TransactionSerializer(txn).data
+            }, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class TransactionHistoryView(generics.ListAPIView):
+    """View transaction history of own accounts (paginated, filterable by type)."""
+    serializer_class = TransactionSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        if user.is_staff:
+            qs = Transaction.objects.all()
+        else:
+            # Transactions related to any of the user's accounts
+            user_accounts = BankAccount.objects.filter(owner=user)
+            qs = Transaction.objects.filter(
+                Q(account__in=user_accounts) |
+                Q(from_account__in=user_accounts) |
+                Q(to_account__in=user_accounts)
+            ).distinct()
+
+        # Filter by transaction type if provided
+        txn_type = self.request.query_params.get('type', None)
+        if txn_type:
+            qs = qs.filter(transaction_type=txn_type.upper())
+
+        return qs
+
+
+class AdminTransactionListView(generics.ListAPIView):
+    """Admin: view all transaction records."""
+    queryset = Transaction.objects.all()
+    serializer_class = TransactionSerializer
+    permission_classes = [permissions.IsAdminUser]
+
+```
+
+### Step 11 — transactions/urls.py
+
+```bash
+from django.urls import path
+from .views import (
+    DepositView,
+    WithdrawView,
+    TransferView,
+    TransactionHistoryView,
+    AdminTransactionListView,
+)
+
+urlpatterns = [
+    path('transactions/deposit/', DepositView.as_view(), name='deposit'),
+    path('transactions/withdraw/', WithdrawView.as_view(), name='withdraw'),
+    path('transactions/transfer/', TransferView.as_view(), name='transfer'),
+    path('transactions/', TransactionHistoryView.as_view(), name='transaction-history'),
+    path('admin/transactions/', AdminTransactionListView.as_view(), name='admin-transactions'),
+]
+
+```
+
+### Step 12 - Connect it in the project - bank_management/urls.py
+
+```bash
+urlpatterns = [
+    ...
+    path('api/', include('transactions.urls')),
+]
+```
+
+
+
+
+
+
+
+## API Endpoints Reference
+
+All endpoints (except register & login) require the header:
+
+```
+Authorization: Token <token_here>
+Content-Type: application/json
+```
+
+### 1. Authentication
+
+| Method | Endpoint                  | Description              | Auth Required |
+|--------|---------------------------|--------------------------|---------------|
+| POST   | `/api/auth/register/`     | Register new customer    | No            |
+| POST   | `/api/auth/login/`        | Login & get token        | No            |
+| GET    | `/api/profile/`           | View own profile         | Yes           |
+| PATCH  | `/api/profile/`           | Update own profile       | Yes           |
+
+
+1.1 **Register new customer & getting the token**
+    Method          : POST
+    API Endpoint    : http://127.0.0.1:8000/api/auth/register/
+
+```json
+{
+  "username": "rajib",
+  "email": "rajib@gmail.com",
+  "password": "Astra@123",
+  "password2": "Astra@123",
+  "first_name": "koushik",
+  "last_name": "rajib"
+}
+```
+
+### Screenshots : ![alt text](<screenshots/1.1 New User Registration, Login& Getting Token.png>)
+
+1.2 **Login & Getting details with Token**
+    Method          : POST
+    API Endpoint    : http://127.0.0.1:8000/api/auth/login/
+
+```json
+{
+  "username": "rajib",
+  "password": "Astra@123"
+}
+```
+
+### Screenshots : 
+
+1.3 **View Own profile**
+    Method          : GET
+    API Endpoint    : http://127.0.0.1:8000/api/auth/profile/
+
+```json
+{
+  "username": "rajib",
+  "password": "Astra@123"
+}
+```
+
+### Screenshots : 
+
+1.4 **Update profile**
+    Method          : PATCH
+    API Endpoint    : http://127.0.0.1:8000/api/auth/profile/
+
+```json
+{
+  "first_name": "Koushik",
+  "last_name": "Rajib",
+  "email": "koushik.rajib@gmail.com"
+}
+```
+
+### Screenshots : 
+
+
+### 2. Bank Account Management 
+
+| Method | Endpoint                          | Description                |
+|--------|-----------------------------------|----------------------------|
+| GET    | `/api/accounts/`                  | List own accounts          |
+| POST   | `/api/accounts/`                  | Create new account         |
+| GET    | `/api/accounts/<id>/`             | View account details       |
+| GET    | `/api/accounts/<id>/balance/`     | Check balance              |
+
+2.1 **Create New Accounts**
+    Method          : POST
+    API Endpoint    : http://127.0.0.1:8000/api/accounts/
+
+```json
+"account_type": "CURRENT"
+```
+```json
+"account_type": "SAVINGS"
+```
+
+### Screenshots : 
+
+2.2 **List Own Accounts**
+    Method          : GET
+    API Endpoint    : http://127.0.0.1:8000/api/accounts/
+
+```json
+{
+"account_type": "CURRENT"
+}
+```
+
+### Screenshots : 
+
+2.3 **View account details**
+    Method          : GET
+    API Endpoint    : http://127.0.0.1:8000/api/accounts/8/
+
+### Screenshots : 
+
+2.4 **Check Balance**
+    Method          : GET
+    API Endpoint    : http://127.0.0.1:8000/api/accounts/9/balance/
+
+
+
+### 3. Transactions (Deposit / Withdraw / Transfer)
+
+| Method | Endpoint                        | Description              |
+|--------|---------------------------------|--------------------------|
+| POST   | `/api/transactions/deposit/`    | Deposit money            |
+| POST   | `/api/transactions/withdraw/`   | Withdraw money           |
+| POST   | `/api/transactions/transfer/`   | Transfer to another acct |
+
+3.1 **Deposit money**
+    Method          : POST
+    API Endpoint    : http://127.0.0.1:8000/api/transactions/deposit/
+
+```json
+{
+    "account_id": 1,
+    "amount": "50000.00",
+    "description": "Salary deposit"
+}
+```
+
+### Screenshots : 
+
+3.2 **Withdraw money**
+    Method          : POST
+    API Endpoint    : http://127.0.0.1:8000/api/transactions/withdraw/
+
+```json
+{
+  "account_id": 1,
+  "amount": "10000.00",
+  "description": "ATM withdrawal"
+}
+```
+
+### Screenshots : 
+
+3.3 **Transfer to another account**
+    Method          : POST
+    API Endpoint    : http://127.0.0.1:8000/api/transactions/transfer/
+
+```json
+  "from_account_id": 8,
+  "to_account_number": "201530439820",
+  "amount": "5000.00",
+  "description": "Payment to Brother"
+```
+
+### Screenshots : 
+
+
+### 4. Transaction History
+
+| Method | Endpoint                  | Description                              |
+|--------|---------------------------|------------------------------------------|
+| GET    | `/api/transactions/`      | Paginated history of own transactions    |
+
+4.1 **Paginated history of own transactions**
+    Method          : GET
+    API Endpoint    : http://127.0.0.1:8000/api/transactions/?type=DEPOSIT&page=1
+
+### Screenshots : 
+
+### 5. Admin Endpoints (Staff only)
+
+| Method | Endpoint                      | Description                |
+|--------|-------------------------------|----------------------------|
+| GET    | `/api/admin/customers/`       | List all customers         |
+| GET    | `/api/admin/accounts/`        | List all bank accounts     |
+| GET    | `/api/admin/transactions/`    | List all transactions      |
+
+**Requires a user with `is_staff=True` or (superuser created via `createsuperuser`)**
+
+5.1 **List All Customers**
+    Method          : GET
+    API Endpoint    : http://127.0.0.1:8000/api/admin/customers/
+
+### Screenshots : 
+
+5.2 **List All Bank Accounts**
+    Method          : GET
+    API Endpoint    : http://127.0.0.1:8000/api/admin/accounts/
+
+### Screenshots : 
+
+5.3 **List All Transactions**
+    Method          : GET
+    API Endpoint    : http://127.0.0.1:8000/api/admin/transactions/
+
+### Screenshots : 
 
 
