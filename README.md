@@ -1,11 +1,11 @@
 
-# Mini Bank Management System API
+# **Mini Bank Management System API**
 
 A RESTful API built with **Django** and **Django REST Framework (DRF)** that provides core banking operations for customers: registration, authentication, account management, deposits, withdrawals, money transfers, and transaction history. Admin users can view all customers, accounts, and transactions.
 
 ---
 
-## Project Description
+## **Project Description**
 
 This project demonstrates:
 
@@ -24,19 +24,19 @@ All endpoints are designed to be tested with Postman, curl, or any HTTP client.
 
 ---
 
-## Technology Stack
+## **Technology Used**
 
 | Component              | Version                   |
 |------------------------|---------------------------|
 | Python                 | 3.10+                     |
-| Django                 | 5.0+ / 6.x                |
+| Django                 | 5.0+                      |
 | Django REST Framework  | 3.14+                     |
 | Database               | SQLite (default)          |
 | Authentication         | DRF Token Authentication  |
 
 ---
 
-## Project Structure
+## **Project Structure**
 
 ```
 bank_management/          # Project root
@@ -54,6 +54,9 @@ bank_management/          # Project root
 │   ├── views.py
 │   ├── urls.py
 │   └── admin.py
+│
+├── screenshots
+│
 └── transactions/         # Deposits, withdrawals, transfers
     ├── models.py         # Transaction model
     ├── serializers.py
@@ -64,15 +67,16 @@ bank_management/          # Project root
 
 ---
 
-## Login Credentials Used
+## **Login Credentials Used**
 
 | username | password |
 |----------|----------|
 | admin    | admin    |
 | kawsar    | Sonali@123    |
+| koushik    | Astra@123    |
 
 
-## Installation & Environment Setup
+## **Installation & Environment Setup**
 
 ### 1. Prerequisites
 
@@ -106,17 +110,922 @@ pip install -r requirements.txt
 Contents of `requirements.txt`:
 
 ```
-Django>=5.0
-djangorestframework>=3.14
+asgiref==3.12.1
+Django==6.1.2
+djangorestframework==3.18.3
+sqlparse==0.6.0
+tzdata==2026.5
 ```
 
-## Creating the project bank_management
+### 5. Database Migrations
+
+```bash
+python manage.py makemigrations
+python manage.py migrate
+```
+
+This creates the SQLite database (`db.sqlite3`) and all tables (User, Token, BankAccount, Transaction, etc.).
+
+### 6. Create Superuser (Admin)
+
+```bash
+python manage.py createsuperuser
+```
+
+Follow the prompts (username, email, password). This admin can access `/admin/` and all admin-only API endpoints.
+
+### 7. Run the Development Server
+
+```bash
+python manage.py runserver
+```
+
+Server starts at: **http://127.0.0.1:8000/**
+
+API base URL: **http://127.0.0.1:8000/api/**
+
+Django Admin: **http://127.0.0.1:8000/admin/**
+
+
+---
+
+## **Creating a Test User and Obtaining a Token**
+
+### Option A – Via Registration Endpoint (Recommended)
+
+**POST** `http://127.0.0.1:8000/api/auth/register/`
+
+```json
+{
+  "username": "kawsar",
+  "email": "kawsar117@gmail.com",
+  "password": "Sonali@123",
+  "password2": "Sonali@123",
+  "first_name": "kawsar",
+  "last_name": "ahmed"
+}
+```
+
+Response (201):
+
+```json
+{
+    "message": "Registration successful.",
+    "token": "5d85794118b2938a3c6a8e4320e5ee990c989a67",
+    "user": {
+        "id": 1,
+        "username": "kawsar",
+        "email": "kawsar117@gmail.com",
+        "first_name": "kawsar",
+        "last_name": "ahmed"
+    }
+}
+```
+
+Save the `token` value. Use it in the header of all protected requests:
+
+```
+Authorization: Token 5d85794118b2938a3c6a8e4320e5ee990c989a67
+```
+
+### Option B – Via Login Endpoint (for testing)
+
+**POST** `http://127.0.0.1:8000/api/auth/login/`
+
+```json
+{
+  "username": "kawsar",
+  "password": "Sonali@123"
+}
+```
+
+
+---
+
+## **Testing with Postman – Suggested Flow**
+
+1. **Register** two users (User A and User B).
+2. **Login** as User A → copy token.
+3. **Create** a Savings account for User A.
+4. **Deposit** 10000.00 into the account.
+5. **Check balance** checking the balance of an account.
+6. **Create** an account for User B (login as User B first).
+7. **Transfer** 2000.00 from User A’s account to User B’s account number.
+8. **View transaction history** for both users.
+9. Try invalid operations (insufficient funds, negative amount, same-account transfer) and verify error responses.
+10. Login as admin and hit the `/api/admin/*` endpoints with a is_staff = True (admin/staff user) as follows : 
+
+    **GET** `http://127.0.0.1:8000/api/admin/customers/`
+    **GET** `http://127.0.0.1:8000/api/admin/accounts/`
+    **GET** `http://127.0.0.1:8000/api/admin/transactions/`
+
+---
+
+## **API Endpoints Execution & Testing with Postman**
+
+All endpoints (except register & login) require the header:
+
+```
+Authorization: Token <token_here>
+Content-Type: application/json
+```
+
+### 1. Authentication
+
+| Method | Endpoint                  | Description              | Auth Required |
+|--------|---------------------------|--------------------------|---------------|
+| POST   | `/api/auth/register/`     | Register new customer    | No            |
+| POST   | `/api/auth/login/`        | Login & get token        | No            |
+| GET    | `/api/profile/`           | View own profile         | Yes           |
+| PATCH  | `/api/profile/`           | Update own profile       | Yes           |
+
+
+1.1 **Register new customer & getting the token**
+    Method          : POST
+    API Endpoint    : http://127.0.0.1:8000/api/auth/register/
+
+```json
+{
+  "username": "rajib",
+  "email": "rajib@gmail.com",
+  "password": "Astra@123",
+  "password2": "Astra@123",
+  "first_name": "koushik",
+  "last_name": "rajib"
+}
+```
+
+### Screenshots : ![alt text](<screenshots/1.1 New User Registration, Login& Getting Token.png>)
+
+1.2 **Login & Getting details with Token**
+    Method          : POST
+    API Endpoint    : http://127.0.0.1:8000/api/auth/login/
+
+```json
+{
+  "username": "rajib",
+  "password": "Astra@123"
+}
+```
+
+### Screenshots : ![alt text](<screenshots/1.2 new User Successful Login.png>)
+
+### Screenshots : ![alt text](<screenshots/1.2 new User Successful Login with Token Authentication.png>)
+
+1.3 **View Own profile**
+    Method          : GET
+    API Endpoint    : http://127.0.0.1:8000/api/auth/profile/
+
+```json
+{
+  "username": "rajib",
+  "password": "Astra@123"
+}
+```
+
+### Screenshots : ![alt text](<screenshots/1.3 View Own Profile of an authenticated user.png>)
+
+### Screenshots : ![alt text](<screenshots/1.3 showing the authenticated logged in profile.png>)
+
+1.4 **Update profile**
+    Method          : PATCH
+    API Endpoint    : http://127.0.0.1:8000/api/auth/profile/
+
+```json
+{
+  "first_name": "Koushik",
+  "last_name": "Rajib",
+  "email": "koushik.rajib@gmail.com"
+}
+```
+
+### Screenshots : ![alt text](<screenshots/1.4 Update Profile of an authenticated user.png>)
+
+
+### 2. Bank Account Management 
+
+| Method | Endpoint                          | Description                |
+|--------|-----------------------------------|----------------------------|
+| GET    | `/api/accounts/`                  | List own accounts          |
+| POST   | `/api/accounts/`                  | Create new account         |
+| GET    | `/api/accounts/<id>/`             | View account details       |
+| GET    | `/api/accounts/<id>/balance/`     | Check balance              |
+
+2.1 **Create New Accounts**
+    Method          : POST
+    API Endpoint    : http://127.0.0.1:8000/api/accounts/
+
+```json
+"account_type": "CURRENT"
+```
+or
+```json
+"account_type": "SAVINGS"
+```
+
+### Screenshots :![alt text](<screenshots/2.2 Create New Accounts.png>)
+
+2.2 **List Own Accounts**
+    Method          : GET
+    API Endpoint    : http://127.0.0.1:8000/api/accounts/
+
+```json
+{
+"account_type": "CURRENT"
+}
+```
+
+### Screenshots : ![alt text](<screenshots/2.1 List of Own Accounts.png>)
+
+2.3 **View account details**
+    Method          : GET
+    API Endpoint    : http://127.0.0.1:8000/api/accounts/8/
+
+### Screenshots : ![alt text](<screenshots/2.3 View Account Details of a Particular Customer.png>)
+
+2.4 **Check Balance**
+    Method          : GET
+    API Endpoint    : http://127.0.0.1:8000/api/accounts/9/balance/
+
+### Screenshots : ![alt text](<screenshots/2.4 Check Balance of Own Account.png>)
+
+
+
+### 3. Transactions (Deposit / Withdraw / Transfer)
+
+| Method | Endpoint                        | Description              |
+|--------|---------------------------------|--------------------------|
+| POST   | `/api/transactions/deposit/`    | Deposit money            |
+| POST   | `/api/transactions/withdraw/`   | Withdraw money           |
+| POST   | `/api/transactions/transfer/`   | Transfer to another acct |
+
+3.1 **Deposit money**
+    Method          : POST
+    API Endpoint    : http://127.0.0.1:8000/api/transactions/deposit/
+
+```json
+{
+    "account_id": 1,
+    "amount": "50000.00",
+    "description": "Salary deposit"
+}
+```
+
+### Screenshots : ![alt text](<screenshots/3.1 Deposit Money.png>)
+
+3.2 **Withdraw money**
+    Method          : POST
+    API Endpoint    : http://127.0.0.1:8000/api/transactions/withdraw/
+
+```json
+{
+  "account_id": 1,
+  "amount": "10000.00",
+  "description": "ATM withdrawal"
+}
+```
+
+### Screenshots : ![alt text](<screenshots/3.2 Withdraw Money.png>)
+
+3.3 **Transfer to another account**
+    Method          : POST
+    API Endpoint    : http://127.0.0.1:8000/api/transactions/transfer/
+
+```json
+  "from_account_id": 8,
+  "to_account_number": "201530439820",
+  "amount": "5000.00",
+  "description": "Payment to Brother"
+```
+
+### Screenshots : ![alt text](<screenshots/3.3 Transfer Money to Another Account.png>)
+
+
+### 4. Transaction History
+
+| Method | Endpoint                  | Description                              |
+|--------|---------------------------|------------------------------------------|
+| GET    | `/api/transactions/`      | Paginated history of own transactions    |
+
+4.1 **Paginated history of own transactions**
+    Method          : GET
+    API Endpoint    : http://127.0.0.1:8000/api/transactions/?type=DEPOSIT&page=1
+
+### Screenshots : ![alt text](<screenshots/4.1 Paginated history of Own Transactions.png>)
+
+### 5. Admin Endpoints (Staff only)
+
+| Method | Endpoint                      | Description                |
+|--------|-------------------------------|----------------------------|
+| GET    | `/api/admin/customers/`       | List all customers         |
+| GET    | `/api/admin/accounts/`        | List all bank accounts     |
+| GET    | `/api/admin/transactions/`    | List all transactions      |
+
+**Requires a user with `is_staff=True` or (superuser created via `createsuperuser`)**
+
+5.1 **List All Customers**
+    Method          : GET
+    API Endpoint    : http://127.0.0.1:8000/api/admin/customers/
+
+### Screenshots : ![alt text](<screenshots/5.1 List of All Customers.png>)
+
+### Screenshots : ![alt text](<screenshots/5.1 List of All Customers 2.png>)
+
+5.2 **List All Bank Accounts**
+    Method          : GET
+    API Endpoint    : http://127.0.0.1:8000/api/admin/accounts/
+
+### Screenshots : ![alt text](<screenshots/5.2 List of All Accounts.png>)
+
+5.3 **List All Transactions**
+    Method          : GET
+    API Endpoint    : http://127.0.0.1:8000/api/admin/transactions/
+
+### Screenshots : ![alt text](<screenshots/5.3 List of All Transactions.png>)
+
+
+### **Admin Panel Screenshots** : 
+
+![alt text](<screenshots/Admin Panel - All Bank Accounts.png>) 
+
+![alt text](<screenshots/Admin Panel - All Tokens.png>) 
+
+![alt text](<screenshots/Admin Panel - All Transactions.png>) 
+
+![alt text](<screenshots/Admin Panel - All Customers.png>)
+
+
+## **Rules Implemented**
+
+1. Every account number is unique and auto-generated.
+2. Account balances can never become negative.
+3. Deposits, withdrawals and transfers reject zero or negative amounts.
+4. Only the account owner can perform transactions on their own accounts.
+5. Customers cannot access other customers’ accounts or transaction histories.
+6. Failed transactions **do not** change any balances (atomic DB transactions).
+7. A successful transfer updates both balances and creates a single transaction record.
+8. Transfer to the same account is forbidden.
+9. Only ACTIVE accounts can receive deposits/withdrawals/transfers.
+
+
+## **Notes & Best Practices Followed**
+
+- Monetary values use `DecimalField` (never float).
+- All money-moving operations are wrapped in `django.db.transaction.atomic()`.
+- Custom permission class `IsOwnerOrAdmin` protects account detail/balance views.
+- Token authentication is the primary auth method (SessionAuthentication also enabled for browsable API).
+- Pagination is enabled globally (page size 5).
+
+## **Future Ideas to be implemented**
+● Filter transactions by date range. 
+● Add daily withdrawal limits. 
+● Write unit tests for deposit, withdrawal, and transfer operations. 
+● Generate a downloadable account statement.
+
+---
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# **Full Project** : 
+
+---
+
+## **Chronological Coding Order**
+
+1. Create project: `django-admin startproject bank_management .`
+2. Create apps: `python manage.py startapp accounts` and `transactions`
+3. Install DRF and add to `INSTALLED_APPS` + configure `REST_FRAMEWORK` settings
+4. Define `BankAccount` model (accounts app)
+5. Define `Transaction` model (transactions app)
+6. Write serializers for registration, profile, accounts, deposit/withdraw/transfer
+7. Implement views with proper permission classes
+8. Wire up URL routes under `/api/`
+9. Register models in Django admin
+10. Run migrations
+11. Create superuser and test endpoints
+12. Finalize the README.md
+
+---
+
+## **Creating the project bank_management**
 
 ```bash
 django-admin startproject bank_management .
 ```
 
-## Creating the accounts app (models, serializers, views, urls)
+## **Creating the accounts app (models, serializers, views, urls)**
 
 ```bash
 python manage.py startapp accounts
@@ -174,6 +1083,7 @@ class BankAccount(models.Model):
 
     account_number = models.CharField(max_length=20, unique=True, editable=False)
     account_type = models.CharField(max_length=10, choices=ACCOUNT_TYPES)
+    # Monetary values use `DecimalField` (never float).
     balance = models.DecimalField(
         max_digits=15,
         decimal_places=2,
@@ -225,7 +1135,6 @@ python manage.py migrate
 ```
 
 ### Step 3 — accounts/serializers.py
-
 
 ```Python
 from rest_framework import serializers
@@ -350,13 +1259,10 @@ from .serializers import (
 )
 
 
-
-""" 
-
-    Order follows the customer journey: 
-        register → login → profile → accounts → balance → admin 
-
 """
+    Order follows the customer journey:  register → login → profile → accounts → balance → admin 
+"""
+
 
 class IsOwnerOrAdmin(permissions.BasePermission):
     """Custom permission: only owner or admin can access."""
@@ -520,7 +1426,7 @@ urlpatterns = [
 
 ### Test the Bank Account API in POSTMAN
 
-Create a user first (or you can go with the admin panel)
+Create a user first and copy the Token from the response.
 
 ```postman/body/raw > POST 
 http://127.0.0.1:8000/api/auth/register/
@@ -531,10 +1437,12 @@ http://127.0.0.1:8000/api/auth/register/
   "username": "kawsar",
   "email": "kawsar117@gmail.com",
   "password": "Sonali@123",
-  "password2": "Sonali@123"
+  "password2": "Sonali@123",
+  "first_name": "kawsar",
+  "last_name": "ahmed"
 }
 ```
-We will get a response containing a TOKEN as below. Copy it.
+Response
 
 ```JSON
 {
@@ -544,24 +1452,22 @@ We will get a response containing a TOKEN as below. Copy it.
         "id": 1,
         "username": "kawsar",
         "email": "kawsar117@gmail.com",
-        "first_name": "",
-        "last_name": ""
+        "first_name": "kawsar",
+        "last_name": "ahmed"
     }
 }
 ```
-### Screenshots : 
+### Screenshots : ![alt text](<screenshots/1. successful user registration and token creation.png>)
 
-![alt text](<screenshots/1. use of token while new user registration.png>)
+```POSTMAN > Headers:
+Authorization: Token 5d85794118b2938a3c6a8e4320e5ee990c989a67
+Content-Type : application/json
+```
 
 Create an account with the generated TOKEN
 
 ```POSTMAN > Method : POST --> body -> raw -> json
 http://127.0.0.1:8000/api/accounts/
-```
-
-```POSTMAN > Headers:
-Authorization: Token <paste_your_token_here>
-Content-Type : application/json
 ```
 
 ```JSON
@@ -575,9 +1481,7 @@ balance         → starts at 0.00
 owner           → automatically set to the logged-in user
 status          → defaults to ACTIVE
 
-### Screenshots : 
-
-![alt text](<screenshots/2. successful user registration and token creation.png>)
+### Screenshots : ![alt text](<screenshots/2. new account creation via POSTMAN.png>)
 
 ## Test in Postman (in this order)
 
@@ -595,21 +1499,6 @@ status          → defaults to ACTIVE
 | **9** | `GET` `/api/admin/customers/` | Customer token | 403 |
 | **10** | Log in as superuser, then:<br>`GET` `/api/admin/customers/`<br>`GET` `/api/admin/accounts/` | Admin token | 200 |
 ---
-
-
-
-### Screenshots : 
-
-![alt text](<screenshots/3. new account creation via POSTMAN.png>)
-
-![alt text](<screenshots/4. get created account number.png>)
-
-![alt text](<screenshots/5. get all created account numbers of the logged in user.png>)
-
-![alt text](<screenshots/6. Admin Panel.png>)
-
-
-
 
 ## Creating the transactions app (models, serializers, views, urls)
 
@@ -711,7 +1600,6 @@ from django.db import transaction as db_transaction
 from accounts.models import BankAccount
 from .models import Transaction
 
-
 class DepositSerializer(serializers.Serializer):
     account_id = serializers.IntegerField()
     amount = serializers.DecimalField(max_digits=15, decimal_places=2, min_value=Decimal('0.01'))
@@ -742,7 +1630,6 @@ class DepositSerializer(serializers.Serializer):
                 created_by=user
             )
         return txn
-
 
 class WithdrawSerializer(serializers.Serializer):
     account_id = serializers.IntegerField()
@@ -865,7 +1752,6 @@ class TransactionSerializer(serializers.ModelSerializer):
         if obj.account:
             return obj.account.account_number
         return None
-
 ```
 
 ### Step 10 — transactions/views.py
@@ -961,7 +1847,6 @@ class AdminTransactionListView(generics.ListAPIView):
     queryset = Transaction.objects.all()
     serializer_class = TransactionSerializer
     permission_classes = [permissions.IsAdminUser]
-
 ```
 
 ### Step 11 — transactions/urls.py
@@ -983,7 +1868,6 @@ urlpatterns = [
     path('transactions/', TransactionHistoryView.as_view(), name='transaction-history'),
     path('admin/transactions/', AdminTransactionListView.as_view(), name='admin-transactions'),
 ]
-
 ```
 
 ### Step 12 - Connect it in the project - bank_management/urls.py
@@ -994,224 +1878,3 @@ urlpatterns = [
     path('api/', include('transactions.urls')),
 ]
 ```
-
-
-
-
-
-
-
-## API Endpoints Reference
-
-All endpoints (except register & login) require the header:
-
-```
-Authorization: Token <token_here>
-Content-Type: application/json
-```
-
-### 1. Authentication
-
-| Method | Endpoint                  | Description              | Auth Required |
-|--------|---------------------------|--------------------------|---------------|
-| POST   | `/api/auth/register/`     | Register new customer    | No            |
-| POST   | `/api/auth/login/`        | Login & get token        | No            |
-| GET    | `/api/profile/`           | View own profile         | Yes           |
-| PATCH  | `/api/profile/`           | Update own profile       | Yes           |
-
-
-1.1 **Register new customer & getting the token**
-    Method          : POST
-    API Endpoint    : http://127.0.0.1:8000/api/auth/register/
-
-```json
-{
-  "username": "rajib",
-  "email": "rajib@gmail.com",
-  "password": "Astra@123",
-  "password2": "Astra@123",
-  "first_name": "koushik",
-  "last_name": "rajib"
-}
-```
-
-### Screenshots : ![alt text](<screenshots/1.1 New User Registration, Login& Getting Token.png>)
-
-1.2 **Login & Getting details with Token**
-    Method          : POST
-    API Endpoint    : http://127.0.0.1:8000/api/auth/login/
-
-```json
-{
-  "username": "rajib",
-  "password": "Astra@123"
-}
-```
-
-### Screenshots : 
-
-1.3 **View Own profile**
-    Method          : GET
-    API Endpoint    : http://127.0.0.1:8000/api/auth/profile/
-
-```json
-{
-  "username": "rajib",
-  "password": "Astra@123"
-}
-```
-
-### Screenshots : 
-
-1.4 **Update profile**
-    Method          : PATCH
-    API Endpoint    : http://127.0.0.1:8000/api/auth/profile/
-
-```json
-{
-  "first_name": "Koushik",
-  "last_name": "Rajib",
-  "email": "koushik.rajib@gmail.com"
-}
-```
-
-### Screenshots : 
-
-
-### 2. Bank Account Management 
-
-| Method | Endpoint                          | Description                |
-|--------|-----------------------------------|----------------------------|
-| GET    | `/api/accounts/`                  | List own accounts          |
-| POST   | `/api/accounts/`                  | Create new account         |
-| GET    | `/api/accounts/<id>/`             | View account details       |
-| GET    | `/api/accounts/<id>/balance/`     | Check balance              |
-
-2.1 **Create New Accounts**
-    Method          : POST
-    API Endpoint    : http://127.0.0.1:8000/api/accounts/
-
-```json
-"account_type": "CURRENT"
-```
-```json
-"account_type": "SAVINGS"
-```
-
-### Screenshots : 
-
-2.2 **List Own Accounts**
-    Method          : GET
-    API Endpoint    : http://127.0.0.1:8000/api/accounts/
-
-```json
-{
-"account_type": "CURRENT"
-}
-```
-
-### Screenshots : 
-
-2.3 **View account details**
-    Method          : GET
-    API Endpoint    : http://127.0.0.1:8000/api/accounts/8/
-
-### Screenshots : 
-
-2.4 **Check Balance**
-    Method          : GET
-    API Endpoint    : http://127.0.0.1:8000/api/accounts/9/balance/
-
-
-
-### 3. Transactions (Deposit / Withdraw / Transfer)
-
-| Method | Endpoint                        | Description              |
-|--------|---------------------------------|--------------------------|
-| POST   | `/api/transactions/deposit/`    | Deposit money            |
-| POST   | `/api/transactions/withdraw/`   | Withdraw money           |
-| POST   | `/api/transactions/transfer/`   | Transfer to another acct |
-
-3.1 **Deposit money**
-    Method          : POST
-    API Endpoint    : http://127.0.0.1:8000/api/transactions/deposit/
-
-```json
-{
-    "account_id": 1,
-    "amount": "50000.00",
-    "description": "Salary deposit"
-}
-```
-
-### Screenshots : 
-
-3.2 **Withdraw money**
-    Method          : POST
-    API Endpoint    : http://127.0.0.1:8000/api/transactions/withdraw/
-
-```json
-{
-  "account_id": 1,
-  "amount": "10000.00",
-  "description": "ATM withdrawal"
-}
-```
-
-### Screenshots : 
-
-3.3 **Transfer to another account**
-    Method          : POST
-    API Endpoint    : http://127.0.0.1:8000/api/transactions/transfer/
-
-```json
-  "from_account_id": 8,
-  "to_account_number": "201530439820",
-  "amount": "5000.00",
-  "description": "Payment to Brother"
-```
-
-### Screenshots : 
-
-
-### 4. Transaction History
-
-| Method | Endpoint                  | Description                              |
-|--------|---------------------------|------------------------------------------|
-| GET    | `/api/transactions/`      | Paginated history of own transactions    |
-
-4.1 **Paginated history of own transactions**
-    Method          : GET
-    API Endpoint    : http://127.0.0.1:8000/api/transactions/?type=DEPOSIT&page=1
-
-### Screenshots : 
-
-### 5. Admin Endpoints (Staff only)
-
-| Method | Endpoint                      | Description                |
-|--------|-------------------------------|----------------------------|
-| GET    | `/api/admin/customers/`       | List all customers         |
-| GET    | `/api/admin/accounts/`        | List all bank accounts     |
-| GET    | `/api/admin/transactions/`    | List all transactions      |
-
-**Requires a user with `is_staff=True` or (superuser created via `createsuperuser`)**
-
-5.1 **List All Customers**
-    Method          : GET
-    API Endpoint    : http://127.0.0.1:8000/api/admin/customers/
-
-### Screenshots : 
-
-5.2 **List All Bank Accounts**
-    Method          : GET
-    API Endpoint    : http://127.0.0.1:8000/api/admin/accounts/
-
-### Screenshots : 
-
-5.3 **List All Transactions**
-    Method          : GET
-    API Endpoint    : http://127.0.0.1:8000/api/admin/transactions/
-
-### Screenshots : 
-
-
